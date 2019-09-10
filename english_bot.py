@@ -1,4 +1,5 @@
 from translate_api import translator, detect_lang
+from database import *
 
 
 def setting_up(response, storage):
@@ -60,14 +61,23 @@ def display_translation(response, phrase, storage):
     translation = translator(phrase, lang)
     response.set_text(translation + "\n\nДобавить в словарь?")
     response.set_buttons([{"title": "да"}, {"title": "нет"}])
+    storage["current_word"] = phrase
+    storage["current_translation"] = translation
     return response, storage
 
 
 def dictionary_addition(response, answer, storage):
     if answer == "да":
+        data_base = DataBase()
+        data_base.create_table(storage["session_id"])
+        data_base.inserting(storage["words_num"], storage["current_word"], storage["current_translation"])
+        storage["words_num"] += 1
+
         response.set_text("OK!")
         storage.pop("answer_awaiting")
         response = restart_dialogue(response)
+
+        data_base.close()
     elif answer == "нет":
         response.set_text("Ну ладно(")
         storage.pop("answer_awaiting")
@@ -113,8 +123,12 @@ def display_rules(response, storage):
 
 def handle_dialog(request, response, user_storage):
     if request.is_new_session:
-        user_storage = {}
         # пользователь общается с ботом впервые
+        user_storage = {"session_id": request.session_id,
+                        "words_num": 0}
+        data_base = DataBase()
+        data_base.create_table(user_storage["session_id"])
+        data_base.close()
         return setting_up(response, user_storage)
     else:
         # обрабатываем ответы пользователя
