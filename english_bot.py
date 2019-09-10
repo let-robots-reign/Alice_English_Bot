@@ -1,48 +1,9 @@
-def handle_dialog(request, response, user_storage):
-    if request.is_new_session:
-        user_storage = {}
-        # пользователь общается с ботом впервые
-        return setting_up(response), user_storage
-    else:
-        # обрабатываем ответы пользователя
-        if "lang" not in user_storage:
-            if request.command.lower() == "русский":
-                user_storage["lang"] = "ru"
-            elif request.command.lower() == "english":
-                user_storage["lang"] = "en"
-            return display_start_message(response, user_storage), user_storage
-
-        elif "answer_awaiting" in user_storage:  # бот ожидает от пользователя какой-то определенный ответ
-            if user_storage["answer_awaiting"] == "translate":
-                # любая строка, которую введет пользователь, будет переведена
-                user_storage["answer_awaiting"] = "dictionary_add"
-                return display_translation(response, user_storage), user_storage
-            elif user_storage["answer_awaiting"] == "dictionary_add":  # пользователь должен решить, добавлять в словарь или нет
-                return dictionary_addition(response, user_storage), user_storage
-            elif user_storage["answer_awaiting"] == "erase":
-                return erase_question(response), user_storage
-
-        elif request.command.lower() == "перевести":
-            user_storage["answer_awaiting"] = "translate"
-            return suggest_to_translate(response), user_storage
-
-        elif request.command.lower() == "словарь":
-            return display_dictionary(response, user_storage), user_storage
-
-        elif request.command.lower() == "правила":
-            return display_rules(response), user_storage
-
-        elif request.command.lower() == "стереть данные":
-            user_storage["answer_awaiting"] = "erase"
-            return
-
-
-def setting_up(response):
+def setting_up(response, storage):
     response.set_text("Выберите язык, на котором я буду с вами говорить.\n\n"
                       "Choose the language I will speak.")
     response.set_buttons([{"title": "Русский", "hide": True},
                           {"title": "English", "hide": True}])
-    return response
+    return response, storage
 
 
 def display_start_message(response, storage):
@@ -72,28 +33,124 @@ def display_start_message(response, storage):
                               {"title": "правила", "hide": True},
                               {"title": "стереть данные", "hide": True}])
 
+    return response, storage
+
+
+def restart_dialogue(response):
+    # возвращаем диалог в изначальное состояние
+    # добавляем основные кнопки
+    response.set_buttons([{"title": "перевести", "hide": True},
+                          {"title": "тренировка", "hide": True},
+                          {"title": "словарь", "hide": True},
+                          {"title": "правила", "hide": True},
+                          {"title": "стереть данные", "hide": True}])
     return response
 
 
-def suggest_to_translate(response):
+def suggest_to_translate(response, storage):
     response.set_text("Введите слово или фразу, и я пришлю вам перевод")
+    return response, storage
 
 
-def display_translation(response, storage):
-    pass
+def display_translation(response, phrase, storage):
+    translation = translate(phrase)
+    response.set_text(translation)
+    response.set_buttons([{"title": "да"}, {"title": "нет"}])
+    return response, storage
 
 
-def dictionary_addition(response, user_storage):
-    pass
+def dictionary_addition(response, answer, storage):
+    if answer == "да":
+        response.set_text("OK!")
+        storage.pop("answer_awaiting")
+        response = restart_dialogue(response)
+    elif answer == "нет":
+        response.set_text("Ну ладно(")
+        storage.pop("answer_awaiting")
+        response = restart_dialogue(response)
+    else:
+        response.set_text("Я не понимаю твой ответ")
+
+    return response, storage
 
 
-def erase_question(response):
-    pass
+def erase_question(response, storage):
+    response.set_text("Удалить данные?")
+    response.set_buttons([{"title": "да"}, {"title": "нет"}])
+    return response, storage
+
+
+def confirm_erase(response, answer, storage):
+    if answer == "да":
+        response.set_text("OK! Удалил")
+        storage.pop("answer_awaiting")
+        response = restart_dialogue(response)
+    elif answer == "нет":
+        response.set_text("Ну ладно( не буду удалять")
+        storage.pop("answer_awaiting")
+        response = restart_dialogue(response)
+    else:
+        response.set_text("Я не понимаю твой ответ")
+
+    return response, storage
 
 
 def display_dictionary(response, storage):
-    pass
+    response.set_text("Последние слова:\nHello\nparrot\nteacher")
+    response = restart_dialogue(response)
+    return response, storage
 
 
-def display_rules(response):
-    pass
+def display_rules(response, storage):
+    response.set_text("Здесь написаны правила")
+    response = restart_dialogue(response)
+    return response, storage
+
+
+def translate(phrase):
+    return "Hello! This is {}. Save to dictionary?".format(phrase)
+
+
+def handle_dialog(request, response, user_storage):
+    if request.is_new_session:
+        user_storage = {}
+        # пользователь общается с ботом впервые
+        return setting_up(response, user_storage)
+    else:
+        # обрабатываем ответы пользователя
+        if "lang" not in user_storage:
+            if request.command.lower() == "русский":
+                user_storage["lang"] = "ru"
+            elif request.command.lower() == "english":
+                user_storage["lang"] = "en"
+            return display_start_message(response, user_storage)
+
+        elif "answer_awaiting" in user_storage:  # бот ожидает от пользователя какой-то определенный ответ
+            if user_storage["answer_awaiting"] == "translate":
+                # любая строка, которую введет пользователь, будет переведена
+                user_storage["answer_awaiting"] = "dictionary_add"
+                translate_item = request.command
+                return display_translation(response, translate_item, user_storage)
+            elif user_storage["answer_awaiting"] == "dictionary_add":  # пользователь должен решить, добавлять в словарь или нет
+                answer = request.command.lower()
+                return dictionary_addition(response, answer, user_storage)
+            elif user_storage["answer_awaiting"] == "erase":
+                user_storage["answer_awaiting"] = "confirm_erase"
+                return erase_question(response, user_storage)
+            elif user_storage["answer_awaiting"] == "confirm_erase":
+                answer = request.command.lower()
+                return confirm_erase(response, answer, user_storage)
+
+        elif request.command.lower() == "перевести":
+            user_storage["answer_awaiting"] = "translate"
+            return suggest_to_translate(response, user_storage)
+
+        elif request.command.lower() == "словарь":
+            return display_dictionary(response, user_storage)
+
+        elif request.command.lower() == "правила":
+            return display_rules(response, user_storage)
+
+        elif request.command.lower() == "стереть данные":
+            user_storage["answer_awaiting"] = "erase"
+            return
