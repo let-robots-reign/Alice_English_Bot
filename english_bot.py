@@ -1,3 +1,6 @@
+from translate_api import translator, detect_lang
+
+
 def setting_up(response, storage):
     response.set_text("Выберите язык, на котором я буду с вами говорить.\n\n"
                       "Choose the language I will speak.")
@@ -53,8 +56,9 @@ def suggest_to_translate(response, storage):
 
 
 def display_translation(response, phrase, storage):
-    translation = translate(phrase)
-    response.set_text(translation)
+    lang = detect_lang(phrase)
+    translation = translator(phrase, lang)
+    response.set_text(translation + "\n\nДобавить в словарь?")
     response.set_buttons([{"title": "да"}, {"title": "нет"}])
     return response, storage
 
@@ -105,10 +109,6 @@ def display_rules(response, storage):
     response.set_text("Здесь написаны правила")
     response = restart_dialogue(response)
     return response, storage
-
-
-def translate(phrase):
-    return "Hello! This is {}. Save to dictionary?".format(phrase)
 
 
 def handle_dialog(request, response, user_storage):
