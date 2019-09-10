@@ -2,40 +2,13 @@ from translate_api import translator, detect_lang
 from database import *
 
 
-def setting_up(response, storage):
-    response.set_text("Выберите язык, на котором я буду с вами говорить.\n\n"
-                      "Choose the language I will speak.")
-    response.set_buttons([{"title": "Русский", "hide": True},
-                          {"title": "English", "hide": True}])
-    return response, storage
-
-
 def display_start_message(response, storage):
-    if "lang" not in storage:
-        response.set_text("Вы еще не выбрали язык, на котором я буду говорить.\n\n"
-                          "You haven't chosen the language I'll be speaking.")
-    elif storage["lang"] == "ru":
-        response.set_text("Здравствуй! Я бот, который помогает учить английский. Я могу переводить любые слова "
-                          "и фразы, а позже вы можете добавлять их в свой личный словарь, после чего тренировать "
-                          "с помощью различных упражнений.\n Список и описание упражнений можно посмотреть, "
-                          "нажав на кнопку \"правила\". Также вы можете все стереть и начать заново с помощью "
-                          "кнопки \"стереть данные\".\nДавайте начнем!")
-    elif storage["lang"] == "en":
-        response.set_text("Hello! I'm a bot that is constructed for learning English. I can translate any word or "
-                          "phrase for you, and after that you can add it to your dictionary and learn with several "
-                          "types of trainings whenever you want.\nYou can look up the list of trainings via /rules "
-                          "command. Also, you can reset all your data and start from the beginning using /reset "
-                          "command.\nLet's get started!")
-
-    if "lang" not in storage:
-        response.set_buttons([{"title": "Русский", "hide": True},
-                              {"title": "English", "hide": True}])
-    else:
-        response.set_buttons([{"title": "перевести", "hide": True},
-                              {"title": "тренировка", "hide": True},
-                              {"title": "словарь", "hide": True},
-                              {"title": "правила", "hide": True},
-                              {"title": "стереть данные", "hide": True}])
+    response.set_text("Здравствуй! Я бот, который помогает учить английский. Я могу переводить любые слова "
+                      "и фразы, а позже вы можете добавлять их в свой личный словарь, после чего тренировать "
+                      "с помощью различных упражнений.\n Список и описание упражнений можно посмотреть, "
+                      "нажав на кнопку \"правила\". Также вы можете все стереть и начать заново с помощью "
+                      "кнопки \"стереть данные\".\nДавайте начнем!")
+    response = restart_dialogue(response)
 
     return response, storage
 
@@ -45,7 +18,7 @@ def restart_dialogue(response):
     # добавляем основные кнопки
     response.set_buttons([{"title": "перевести", "hide": True},
                           {"title": "тренировка", "hide": True},
-                          {"title": "словарь", "hide": True},
+                          {"title": "последние слова", "hide": True},
                           {"title": "правила", "hide": True},
                           {"title": "стереть данные", "hide": True}])
     return response
@@ -62,7 +35,7 @@ def display_translation(response, phrase, storage):
     response.set_text(translation + "\n\nДобавить в словарь?")
     response.set_buttons([{"title": "да"}, {"title": "нет"}])
     storage["current_word"] = phrase
-    storage["current_translation"] = translation
+    storage["current_translation"] = "\n\n".join(translation.split("\n\n")[:-1])
     return response, storage
 
 
@@ -70,7 +43,7 @@ def dictionary_addition(response, answer, storage):
     if answer == "да":
         data_base = DataBase()
         data_base.create_table(storage["session_id"])
-        data_base.inserting(storage["words_num"], storage["current_word"], storage["current_translation"])
+        data_base.insert_word(storage["words_num"], storage["current_word"], storage["current_translation"])
         storage["words_num"] += 1
 
         response.set_text("OK!")
@@ -84,6 +57,24 @@ def dictionary_addition(response, answer, storage):
         response = restart_dialogue(response)
     else:
         response.set_text("Я не понимаю твой ответ")
+
+    return response, storage
+
+
+def show_dict(response, storage):
+    data_base = DataBase()
+    data_base.create_table(storage["session_id"])
+    dictionary = data_base.read_dict()
+    if not dictionary:
+        response.set_text("Извините, похоже, вы еще ничего не добавили в словарь.")
+    else:
+        response.set_text("Последние добавленные слова:"
+                          "\n".join(
+            ["{} - {}".format(word, translation) for index, word, translation in dictionary[:50][::-1]]))
+
+    data_base.close()
+
+    response = restart_dialogue(response)
 
     return response, storage
 
@@ -109,12 +100,6 @@ def confirm_erase(response, answer, storage):
     return response, storage
 
 
-def display_dictionary(response, storage):
-    response.set_text("Последние слова:\nHello\nparrot\nteacher")
-    response = restart_dialogue(response)
-    return response, storage
-
-
 def display_rules(response, storage):
     response.set_text("Здесь написаны правила")
     response = restart_dialogue(response)
@@ -129,17 +114,9 @@ def handle_dialog(request, response, user_storage):
         data_base = DataBase()
         data_base.create_table(user_storage["session_id"])
         data_base.close()
-        return setting_up(response, user_storage)
+        return display_start_message(response, user_storage)
     else:
-        # обрабатываем ответы пользователя
-        if "lang" not in user_storage:
-            if request.command.lower() == "русский":
-                user_storage["lang"] = "ru"
-            elif request.command.lower() == "english":
-                user_storage["lang"] = "en"
-            return display_start_message(response, user_storage)
-
-        elif "answer_awaiting" in user_storage:  # бот ожидает от пользователя какой-то определенный ответ
+        if "answer_awaiting" in user_storage:  # бот ожидает от пользователя какой-то определенный ответ
             if user_storage["answer_awaiting"] == "translate":
                 # любая строка, которую введет пользователь, будет переведена
                 user_storage["answer_awaiting"] = "dictionary_add"
@@ -159,8 +136,8 @@ def handle_dialog(request, response, user_storage):
             user_storage["answer_awaiting"] = "translate"
             return suggest_to_translate(response, user_storage)
 
-        elif request.command.lower() == "словарь":
-            return display_dictionary(response, user_storage)
+        elif request.command.lower() == "последние слова":
+            return show_dict(response, user_storage)
 
         elif request.command.lower() == "правила":
             return display_rules(response, user_storage)
