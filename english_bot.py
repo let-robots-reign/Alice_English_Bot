@@ -1,5 +1,15 @@
 from translate_api import translator, detect_lang
 from database import *
+import random
+import sys
+
+
+try:
+    with open("preset_words.txt", "r", encoding="utf-8-sig") as infile:
+        preset_words = [(line.strip().split()[0], line.strip().split()[1]) for line in infile.readlines()]
+except FileNotFoundError:
+    print("Отсутствует файл 'preset_words.txt'")
+    sys.exit(1)
 
 
 def display_start_message(response, storage):
@@ -84,6 +94,16 @@ def show_dict(response, storage):
     return response, storage
 
 
+def choose_training(response, storage):
+    response.set_text("Выберите тренировку")
+    response.set_buttons([{"title": "слово-перевод", "hide": True},
+                          {"title": "перевод-слово", "hide": True},
+                          {"title": "собери слово", "hide": True},
+                          {"title": "угадай слово", "hide": True},
+                          {"title": "выход из раздела", "hide": True}])
+    return response, storage
+
+
 def erase_question(response, storage):
     response.set_text("Удалить данные?")
     response.set_buttons([{"title": "да"}, {"title": "нет"}])
@@ -108,6 +128,83 @@ def confirm_erase(response, answer, storage):
     else:
         response.set_text("Я не понимаю твой ответ")
 
+    return response, storage
+
+
+def launch_training(response, answer, storage):
+    if answer == "слово-перевод":
+        return word_translation_training(response, storage)
+    elif answer == "перевод-слово":
+        return translation_word_training(response, storage)
+    elif answer == "собери слово":
+        return collect_word_training(response, storage)
+    elif answer == "угадай слово":
+        return guess_word_training(response, storage)
+    elif "выход" in answer:
+        storage.pop("answer_awaiting")
+        response.set_text("Возвращаемся в основной раздел")
+        response = restart_dialogue(response)
+        return response, storage
+    else:
+        response.set_text("Я не понимаю твой ответ")
+        return response, storage
+
+
+def word_translation_training(response, storage):
+    data_base = DataBase()
+    data_base.create_table(storage["session_id"])
+
+    records = [record for record in data_base.select_uncompleted_words()]  # список слов для тренировки
+    word, translation = random.choice(records)
+    answer_position = random.randint(0, 3)  # позиция правильного ответа
+    buttons = [{"hide": True}, {"hide": True}, {"hide": True}, {"hide": True}]
+    buttons[answer_position]["title"] = translation
+
+    temp_preset_words = [item for item in preset_words if item not in records]
+
+    for i in range(len(buttons)):
+        if "title" not in buttons[i]:
+            if len(records) >= 3:  # если есть чем заполнить варианты
+                fill_record = random.choice(records)
+                del records[records.index((fill_record[0], fill_record[1]))]
+            else:
+                fill_record = random.choice(temp_preset_words)
+                del temp_preset_words[temp_preset_words.index((fill_record[0], fill_record[1]))]
+            buttons[i]["title"] = fill_record[1]
+
+    response.set_text("Выберите верный перевод слова {}".format(word))
+    response.set_buttons(buttons)
+    storage["current_answer"] = translation
+    storage["answer_awaiting"] = "training_answer"
+    data_base.close()
+    return response, storage
+
+
+def translation_word_training(response, storage):
+    pass
+
+
+def collect_word_training(response, storage):
+    pass
+
+
+def guess_word_training(response, storage):
+    pass
+
+
+def check_answer(response, answer, storage):
+    if answer == storage["current_answer"]:
+        result = "Верно!"
+    else:
+        result = "Неверно! Правильный ответ: {}".format(storage["current_answer"])
+
+    storage["answer_awaiting"] = "training"
+    response.set_text("{}\n\nВыберите тренировку".format(result))
+    response.set_buttons([{"title": "слово-перевод", "hide": True},
+                          {"title": "перевод-слово", "hide": True},
+                          {"title": "собери слово", "hide": True},
+                          {"title": "угадай слово", "hide": True},
+                          {"title": "выход из раздела", "hide": True}])
     return response, storage
 
 
@@ -136,12 +233,33 @@ def handle_dialog(request, response, user_storage):
             elif user_storage["answer_awaiting"] == "dictionary_add":  # пользователь должен решить, добавлять в словарь или нет
                 answer = request.command.lower()
                 return dictionary_addition(response, answer, user_storage)
-            elif user_storage["answer_awaiting"] == "erase":
-                return confirm_erase(response, request.command, user_storage)
+            elif user_storage["answer_awaiting"] == "erase":  # пользователь решает, удалять словарь или нет
+                answer = request.command.lower()
+                return confirm_erase(response, answer, user_storage)
+            elif user_storage["answer_awaiting"] == "training":  # пользователь должен выбрать тренировку
+                answer = request.command.lower()
+                return launch_training(response, answer, user_storage)
+            elif user_storage["answer_awaiting"] == "training_answer":  # пользователь должен ответить на задание
+                answer = request.command.lower()
+                return check_answer(response, answer, user_storage)
 
         elif request.command.lower() == "перевести":
             user_storage["answer_awaiting"] = "translate"
             return suggest_to_translate(response, user_storage)
+
+        elif request.command.lower() == "тренировка":
+            data_base = DataBase()
+            data_base.create_table(user_storage["session_id"])
+            uncompleted = data_base.select_uncompleted_words()
+            data_base.close()
+            if not uncompleted:
+                response.set_text("Вы не можете тренировать слова, так как ваш словарь пуст, "
+                                  "либо же вы уже выучили все слова")
+                response = restart_dialogue(response)
+                return response, user_storage
+            else:
+                user_storage["answer_awaiting"] = "training"
+                return choose_training(response, user_storage)
 
         elif request.command.lower() == "последние слова":
             return show_dict(response, user_storage)

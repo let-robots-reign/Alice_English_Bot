@@ -20,6 +20,10 @@ class DataBase:
         except Exception as e:
             print(e)
 
+    def select_uncompleted_words(self):
+        self.cursor.execute("SELECT english_word, translation FROM `%s` WHERE completion < 100;" % (self.user_id))
+        return self.cursor.fetchall()
+
     def read_dict(self):
         self.cursor.execute("SELECT * FROM `%s`" % (self.user_id))
         return self.cursor.fetchall()
