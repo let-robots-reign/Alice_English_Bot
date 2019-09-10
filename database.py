@@ -9,13 +9,13 @@ class DataBase:
 
     def create_table(self, user_id):
         self.user_id = user_id
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS `%s`(word_id INT, english_word TEXT, translation TEXT)"
-                            % (user_id))
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS `%s`(word_id INT, english_word TEXT, translation TEXT, "
+                            "completion INT)" % (user_id))
 
     def insert_word(self, word_num, word, translation):
         try:
-            self.cursor.execute("INSERT INTO `%s`(word_id, english_word, translation) VALUES(?, ?, ?)"
-                                % (self.user_id), (word_num, word, translation))
+            self.cursor.execute("INSERT INTO `%s`(word_id, english_word, translation, completion) VALUES(?, ?, ?, ?)"
+                                % (self.user_id), (word_num, word, translation, 0))
             self.conn.commit()
         except Exception as e:
             print(e)
@@ -23,6 +23,10 @@ class DataBase:
     def read_dict(self):
         self.cursor.execute("SELECT * FROM `%s`" % (self.user_id))
         return self.cursor.fetchall()
+
+    def delete_dict(self):
+        self.cursor.execute("DELETE FROM `%s`" % (self.user_id))
+        self.conn.commit()
 
     def close(self):
         self.cursor.close()

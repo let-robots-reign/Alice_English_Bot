@@ -34,8 +34,14 @@ def display_translation(response, phrase, storage):
     translation = translator(phrase, lang)
     response.set_text(translation + "\n\nДобавить в словарь?")
     response.set_buttons([{"title": "да"}, {"title": "нет"}])
-    storage["current_word"] = phrase
-    storage["current_translation"] = "\n\n".join(translation.split("\n\n")[:-1])
+
+    if lang == "ru-en":
+        storage["current_word"] = translation.split("\n\n")[0]
+        storage["current_translation"] = phrase
+    elif lang == "en-ru":
+        storage["current_word"] = phrase
+        storage["current_translation"] = translation.split("\n\n")[0]
+
     return response, storage
 
 
@@ -68,9 +74,8 @@ def show_dict(response, storage):
     if not dictionary:
         response.set_text("Извините, похоже, вы еще ничего не добавили в словарь.")
     else:
-        response.set_text("Последние добавленные слова:"
-                          "\n".join(
-            ["{} - {}".format(word, translation) for index, word, translation in dictionary[:50][::-1]]))
+        response.set_text("\n\n".join(
+            ["{} - {}".format(word, translation) for index, word, translation, completion in dictionary[:50][::-1]]))
 
     data_base.close()
 
@@ -87,12 +92,18 @@ def erase_question(response, storage):
 
 def confirm_erase(response, answer, storage):
     if answer == "да":
-        response.set_text("OK! Удалил")
+        data_base = DataBase()
+        data_base.create_table(storage["session_id"])
+        data_base.delete_dict()
+
+        response.set_text("Ваш словарь был удален")
         storage.pop("answer_awaiting")
         response = restart_dialogue(response)
+
+        data_base.close()
     elif answer == "нет":
-        response.set_text("Ну ладно( не буду удалять")
         storage.pop("answer_awaiting")
+        response.set_text("Словарь не был удален")
         response = restart_dialogue(response)
     else:
         response.set_text("Я не понимаю твой ответ")
@@ -126,11 +137,7 @@ def handle_dialog(request, response, user_storage):
                 answer = request.command.lower()
                 return dictionary_addition(response, answer, user_storage)
             elif user_storage["answer_awaiting"] == "erase":
-                user_storage["answer_awaiting"] = "confirm_erase"
-                return erase_question(response, user_storage)
-            elif user_storage["answer_awaiting"] == "confirm_erase":
-                answer = request.command.lower()
-                return confirm_erase(response, answer, user_storage)
+                return confirm_erase(response, request.command, user_storage)
 
         elif request.command.lower() == "перевести":
             user_storage["answer_awaiting"] = "translate"
@@ -144,4 +151,4 @@ def handle_dialog(request, response, user_storage):
 
         elif request.command.lower() == "стереть данные":
             user_storage["answer_awaiting"] = "erase"
-            return
+            return erase_question(response, user_storage)
