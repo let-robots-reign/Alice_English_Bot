@@ -1,4 +1,4 @@
-from translate_api import translator, detect_lang
+from translate_api import translator, detect_lang, get_definition
 from database import *
 import random
 import sys
@@ -147,6 +147,11 @@ def launch_training(response, answer, storage):
         return response, storage
     else:
         response.set_text("Я не понимаю твой ответ")
+        response.set_buttons([{"title": "слово-перевод", "hide": True},
+                              {"title": "перевод-слово", "hide": True},
+                              {"title": "собери слово", "hide": True},
+                              {"title": "угадай слово", "hide": True},
+                              {"title": "выход из раздела", "hide": True}])
         return response, storage
 
 
@@ -162,10 +167,10 @@ def pick_word(storage):
     return word, translation, records
 
 
-def create_buttons(translation, records):
+def create_buttons(option, records, lang):
     answer_position = random.randint(0, 3)  # позиция правильного ответа
     buttons = [{"hide": True}, {"hide": True}, {"hide": True}, {"hide": True}]
-    buttons[answer_position]["title"] = translation
+    buttons[answer_position]["title"] = option
 
     temp_preset_words = [item for item in preset_words if item not in records]
 
@@ -177,16 +182,16 @@ def create_buttons(translation, records):
             else:
                 fill_record = random.choice(temp_preset_words)
                 del temp_preset_words[temp_preset_words.index((fill_record[0], fill_record[1]))]
-            buttons[i]["title"] = fill_record[1]
+            buttons[i]["title"] = fill_record[1] if lang == "ru" else fill_record[0]
 
     return buttons
 
 
 def word_translation_training(response, storage):
     word, translation, records = pick_word(storage)
-    buttons = create_buttons(translation, records)
+    buttons = create_buttons(translation, records, "ru")
 
-    response.set_text("Выберите верный перевод слова {}".format(word))
+    response.set_text("Выберите верный перевод слова \"{}\"".format(word))
     response.set_buttons(buttons)
     storage["current_answer"] = translation
     storage["answer_awaiting"] = "training_answer"
@@ -195,9 +200,9 @@ def word_translation_training(response, storage):
 
 def translation_word_training(response, storage):
     word, translation, records = pick_word(storage)
-    buttons = create_buttons(translation, records)
+    buttons = create_buttons(word, records, "en")
 
-    response.set_text("Выберите верный перевод слова {}".format(translation))
+    response.set_text("Выберите верный перевод слова \"{}\"".format(translation))
     response.set_buttons(buttons)
     storage["current_answer"] = word
     storage["answer_awaiting"] = "training_answer"
@@ -208,15 +213,32 @@ def collect_word_training(response, storage):
     word, _, _ = pick_word(storage)
     letters = list(word)
     random.shuffle(letters)
-    response.set_text("Составьте слово из перемешанных букв:\n"
-                      " ".join(letters))
+    response.set_text("Составьте слово из перемешанных букв:\n" + " ".join(letters))
     storage["current_answer"] = word
     storage["answer_awaiting"] = "training_answer"
     return response, storage
 
 
 def guess_word_training(response, storage):
-    pass
+    word, translation, records = pick_word(storage)
+    buttons = create_buttons(word, records, "en")
+
+    definition = get_definition(word, "en")
+    if definition:
+        response.set_text("Угадайте слово по его определению:\n{}".format(definition))
+        response.set_buttons(buttons)
+        storage["current_answer"] = word
+        storage["answer_awaiting"] = "training_answer"
+    else:
+        response.set_text("К сожалению, я не могу найти определение слову \"{}\"".format(word))
+        response.set_buttons([{"title": "слово-перевод", "hide": True},
+                              {"title": "перевод-слово", "hide": True},
+                              {"title": "собери слово", "hide": True},
+                              {"title": "угадай слово", "hide": True},
+                              {"title": "выход из раздела", "hide": True}])
+        storage["answer_awaiting"] = "training"
+
+    return response, storage
 
 
 def check_answer(response, answer, storage):
@@ -297,3 +319,9 @@ def handle_dialog(request, response, user_storage):
         elif request.command.lower() == "стереть данные":
             user_storage["answer_awaiting"] = "erase"
             return erase_question(response, user_storage)
+
+        # если пользователь вводит что-то другое, кроме запросов, просто переводим его сообщение
+        else:
+            user_storage["answer_awaiting"] = "dictionary_add"
+            translate_item = request.command
+            return display_translation(response, translate_item, user_storage)
