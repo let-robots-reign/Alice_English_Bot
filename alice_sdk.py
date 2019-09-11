@@ -14,6 +14,10 @@ class AliceRequest(object):
         return self._request_dict['session']
 
     @property
+    def session_id(self):
+        return self.session["session_id"]
+
+    @property
     def user_id(self):
         return self.session['user_id']
 
