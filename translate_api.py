@@ -2,7 +2,7 @@ import requests
 import os
 
 
-API_KEY = os.environ["API Translator"]
+API_KEY = os.environ["API_Translator"]
 OED_APP_ID = os.environ["OED_APP_ID"]
 OED_KEY = os.environ["OED_KEY"]
 
