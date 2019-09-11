@@ -58,7 +58,7 @@ def display_translation(response, phrase, storage):
 def dictionary_addition(response, answer, storage):
     if answer == "да":
         data_base = DataBase()
-        data_base.create_table(storage["session_id"])
+        data_base.create_table(storage["user_id"])
 
         if (storage["current_word"], storage["current_translation"]) in [(item[1], item[2]) for
                                                                          item in data_base.read_dict()]:
@@ -86,7 +86,7 @@ def dictionary_addition(response, answer, storage):
 
 def show_dict(response, storage):
     data_base = DataBase()
-    data_base.create_table(storage["session_id"])
+    data_base.create_table(storage["user_id"])
     dictionary = data_base.read_dict()
     if not dictionary:
         response.set_text("Извините, похоже, вы еще ничего не добавили в словарь.")
@@ -120,7 +120,7 @@ def erase_question(response, storage):
 def confirm_erase(response, answer, storage):
     if answer == "да":
         data_base = DataBase()
-        data_base.create_table(storage["session_id"])
+        data_base.create_table(storage["user_id"])
         data_base.delete_dict()
 
         response.set_text("Ваш словарь был удален")
@@ -164,7 +164,7 @@ def launch_training(response, answer, storage):
 
 def pick_word(storage):
     data_base = DataBase()
-    data_base.create_table(storage["session_id"])
+    data_base.create_table(storage["user_id"])
 
     records = [record for record in data_base.select_uncompleted_words()]  # список слов для тренировки
     word, translation = random.choice(records)
@@ -253,7 +253,7 @@ def guess_word_training(response, storage):
 
 def check_answer(response, answer, storage):
     data_base = DataBase()
-    data_base.create_table(storage["session_id"])
+    data_base.create_table(storage["user_id"])
 
     if answer == storage["current_answer"]:
         result = "Верно!\n{} - {}".format(storage["current_word"], storage["current_translation"])
@@ -289,14 +289,12 @@ def display_rules(response, storage):
 
 
 def handle_dialog(request, response, user_storage):
-    print(user_storage)
     if request.is_new_session:
         # пользователь общается с ботом впервые
-        user_storage = {"session_id": request.session_id,
+        user_storage = {"user_id": request.user_id,
                         "words_num": 0}
-        print("NEW!")
         data_base = DataBase()
-        data_base.create_table(user_storage["session_id"])
+        data_base.create_table(user_storage["user_id"])
         data_base.close()
         return display_start_message(response, user_storage)
     else:
@@ -325,7 +323,7 @@ def handle_dialog(request, response, user_storage):
 
         elif request.command.lower() == "тренировка":
             data_base = DataBase()
-            data_base.create_table(user_storage["session_id"])
+            data_base.create_table(user_storage["user_id"])
             uncompleted = data_base.select_uncompleted_words()
             data_base.close()
             if not uncompleted:
