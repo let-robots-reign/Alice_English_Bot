@@ -20,6 +20,14 @@ class DataBase:
         except Exception as e:
             print(e)
 
+    def increment_completion(self, word):
+        self.cursor.execute("SELECT completion FROM `%s` "
+                            "WHERE english_word = ?;" % (self.user_id), (word,))
+        current_completion = self.cursor.fetchall()
+        self.cursor.execute("UPDATE `%s` SET completion = ? WHERE english_word = ?;" % (self.user_id),
+                            (str(int(current_completion[0][0]) + 25), word))
+        self.conn.commit()
+
     def select_uncompleted_words(self):
         self.cursor.execute("SELECT english_word, translation FROM `%s` WHERE completion < 100;" % (self.user_id))
         return self.cursor.fetchall()

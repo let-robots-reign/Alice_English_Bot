@@ -14,10 +14,10 @@ except FileNotFoundError:
 
 def display_start_message(response, storage):
     response.set_text("Здравствуй! Я бот, который помогает учить английский. Я могу переводить любые слова "
-                      "и фразы, а позже вы можете добавлять их в свой личный словарь, после чего тренировать "
-                      "с помощью различных упражнений.\n Список и описание упражнений можно посмотреть, "
-                      "нажав на кнопку \"правила\". Также вы можете все стереть и начать заново с помощью "
-                      "кнопки \"стереть данные\".\nДавайте начнем!")
+                      "и фразы, которые вы можете добавлять в свой личный словарь и тренировать с помощью "
+                      "различных упражнений.\n Список и описание упражнений можно посмотреть, нажав на кнопку "
+                      "\"правила\". Также вы можете все стереть и начать заново с помощью кнопки \"стереть данные\".\n"
+                      "Давайте начнем!")
     response = restart_dialogue(response)
 
     return response, storage
@@ -59,16 +59,23 @@ def dictionary_addition(response, answer, storage):
     if answer == "да":
         data_base = DataBase()
         data_base.create_table(storage["session_id"])
-        data_base.insert_word(storage["words_num"], storage["current_word"], storage["current_translation"])
-        storage["words_num"] += 1
 
-        response.set_text("OK!")
-        storage.pop("answer_awaiting")
-        response = restart_dialogue(response)
+        if (storage["current_word"], storage["current_translation"]) in [(item[1], item[2]) for
+                                                                         item in data_base.read_dict()]:
+            response.set_text("Вы уже добавляли это слово в словарь")
+            response = restart_dialogue(response)
+            storage.pop("answer_awaiting")
+        else:
+            data_base.insert_word(storage["words_num"], storage["current_word"], storage["current_translation"])
+            storage["words_num"] += 1
+
+            response.set_text("Слово добавлено в словарь")
+            storage.pop("answer_awaiting")
+            response = restart_dialogue(response)
 
         data_base.close()
     elif answer == "нет":
-        response.set_text("Ну ладно(")
+        response.set_text("Хорошо, не будем добавлять в словарь")
         storage.pop("answer_awaiting")
         response = restart_dialogue(response)
     else:
@@ -162,6 +169,9 @@ def pick_word(storage):
     records = [record for record in data_base.select_uncompleted_words()]  # список слов для тренировки
     word, translation = random.choice(records)
 
+    storage["current_word"] = word
+    storage["current_translation"] = translation
+
     data_base.close()
 
     return word, translation, records
@@ -242,23 +252,38 @@ def guess_word_training(response, storage):
 
 
 def check_answer(response, answer, storage):
+    data_base = DataBase()
+    data_base.create_table(storage["session_id"])
+
     if answer == storage["current_answer"]:
-        result = "Верно!"
+        result = "Верно!\n{} - {}".format(storage["current_word"], storage["current_translation"])
+        data_base.increment_completion(storage["current_word"])
     else:
         result = "Неверно! Правильный ответ: {}".format(storage["current_answer"])
 
-    storage["answer_awaiting"] = "training"
-    response.set_text("{}\n\nВыберите тренировку".format(result))
-    response.set_buttons([{"title": "слово-перевод", "hide": True},
-                          {"title": "перевод-слово", "hide": True},
-                          {"title": "собери слово", "hide": True},
-                          {"title": "угадай слово", "hide": True},
-                          {"title": "выход из раздела", "hide": True}])
+    if not data_base.select_uncompleted_words():  # если после выполненной тренировки было выучено последнее слово
+        storage.pop("answer_awaiting")
+        response.set_text("Похоже, вы выучили все слова в словаре")
+        response = restart_dialogue(response)
+    else:
+        storage["answer_awaiting"] = "training"
+        response.set_text("{}\n\nВыберите тренировку".format(result))
+        response.set_buttons([{"title": "слово-перевод", "hide": True},
+                              {"title": "перевод-слово", "hide": True},
+                              {"title": "собери слово", "hide": True},
+                              {"title": "угадай слово", "hide": True},
+                              {"title": "выход из раздела", "hide": True}])
+    data_base.close()
+
     return response, storage
 
 
 def display_rules(response, storage):
-    response.set_text("Здесь написаны правила")
+    response.set_text("Вы можете тренировать слова с помощью следующих тренировок:\n"
+                      "1. Слово-перевод. Вам дано слово на английском, необходимо выбрать верный перевод.\n"
+                      "2. Перевод-слово. Вам дан перевод на русский, необходимо выбрать слово на английском.\n"
+                      "3. Собери слово. Буквы какого-то слова перемешались. Вам необходимо составить верное слово из букв.\n"
+                      "4. Угадай слово. Вам дано определение слова на английском. Необходимо угадать, о каком слове идет речь.")
     response = restart_dialogue(response)
     return response, storage
 
