@@ -1,15 +1,10 @@
 import requests
-
-tokens = {}
-with open("tokens", "r", encoding="utf8") as infile:
-    lines = infile.readlines()
-    for line in lines:
-        tokens[line.split(": ")[0]] = line.split(": ")[1]
+import os
 
 
-API_KEY = tokens["API Translator"].strip()
-OED_APP_ID = tokens["OED_APP_ID"].strip()
-OED_KEY = tokens["OED_KEY"].strip()
+API_KEY = os.environ["API_Translator"]
+OED_APP_ID = os.environ["OED_APP_ID"]
+OED_KEY = os.environ["OED_KEY"]
 
 
 def translator(text, lang):

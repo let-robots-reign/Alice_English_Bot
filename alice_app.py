@@ -3,14 +3,14 @@ from __future__ import unicode_literals
 import logging
 from alice_sdk import AliceRequest, AliceResponse
 
-from english_bot import handle_dialog  # логика бота (пока пусто)
+from english_bot import handle_dialog
+from memory_cache import mc
 
 from flask import Flask, request
 app = Flask(__name__)
 
 logging.basicConfig(level=logging.DEBUG)
-
-session_storage = {}  # храним данные о сессиях
+mc.set("session_storage", {})  # кэшируем данные о сессиях
 
 
 @app.route("/", methods=['POST'])
@@ -22,9 +22,13 @@ def main():
 
     user_id = alice_request.user_id
 
-    alice_response, session_storage[user_id] = handle_dialog(
-        alice_request, alice_response, session_storage.get(user_id)
+    alice_response, storage = handle_dialog(
+        alice_request, alice_response, mc.get("session_storage").get(user_id)
     )
+
+    sessions = mc.get("session_storage")
+    sessions[user_id] = storage
+    mc.set("session_storage", sessions)
 
     logging.info('Response: {}'.format(alice_response))
 
