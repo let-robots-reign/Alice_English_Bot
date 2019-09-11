@@ -1,1 +1,1 @@
-web: python alice_app.py runserver 0.0.0.0:$PORT
+web: gunicorn alice_app:app
