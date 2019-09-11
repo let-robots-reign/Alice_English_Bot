@@ -16,7 +16,7 @@ session_storage = {}  # храним данные о сессиях
 @app.route("/", methods=['POST'])
 def main():
     alice_request = AliceRequest(request.json)
-    logging.info('Request: {}'.format(alice_request))
+    #logging.info('Request: {}'.format(alice_request))
 
     alice_response = AliceResponse(alice_request)
 
@@ -26,7 +26,7 @@ def main():
         alice_request, alice_response, session_storage.get(user_id)
     )
 
-    logging.info('Response: {}'.format(alice_response))
+    #logging.info('Response: {}'.format(alice_response))
 
     return alice_response.dumps()
 

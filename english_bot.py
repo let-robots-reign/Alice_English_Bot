@@ -289,10 +289,12 @@ def display_rules(response, storage):
 
 
 def handle_dialog(request, response, user_storage):
+    print(user_storage)
     if request.is_new_session:
         # пользователь общается с ботом впервые
         user_storage = {"session_id": request.session_id,
                         "words_num": 0}
+        print("NEW!")
         data_base = DataBase()
         data_base.create_table(user_storage["session_id"])
         data_base.close()
