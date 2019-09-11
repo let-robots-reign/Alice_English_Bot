@@ -1,1 +1,1 @@
-worker: python english_bot.py
+worker: python alice_app.py
