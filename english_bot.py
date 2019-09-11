@@ -150,12 +150,19 @@ def launch_training(response, answer, storage):
         return response, storage
 
 
-def word_translation_training(response, storage):
+def pick_word(storage):
     data_base = DataBase()
     data_base.create_table(storage["session_id"])
 
     records = [record for record in data_base.select_uncompleted_words()]  # список слов для тренировки
     word, translation = random.choice(records)
+
+    data_base.close()
+
+    return word, translation, records
+
+
+def create_buttons(translation, records):
     answer_position = random.randint(0, 3)  # позиция правильного ответа
     buttons = [{"hide": True}, {"hide": True}, {"hide": True}, {"hide": True}]
     buttons[answer_position]["title"] = translation
@@ -172,20 +179,40 @@ def word_translation_training(response, storage):
                 del temp_preset_words[temp_preset_words.index((fill_record[0], fill_record[1]))]
             buttons[i]["title"] = fill_record[1]
 
+    return buttons
+
+
+def word_translation_training(response, storage):
+    word, translation, records = pick_word(storage)
+    buttons = create_buttons(translation, records)
+
     response.set_text("Выберите верный перевод слова {}".format(word))
     response.set_buttons(buttons)
     storage["current_answer"] = translation
     storage["answer_awaiting"] = "training_answer"
-    data_base.close()
     return response, storage
 
 
 def translation_word_training(response, storage):
-    pass
+    word, translation, records = pick_word(storage)
+    buttons = create_buttons(translation, records)
+
+    response.set_text("Выберите верный перевод слова {}".format(translation))
+    response.set_buttons(buttons)
+    storage["current_answer"] = word
+    storage["answer_awaiting"] = "training_answer"
+    return response, storage
 
 
 def collect_word_training(response, storage):
-    pass
+    word, _, _ = pick_word(storage)
+    letters = list(word)
+    random.shuffle(letters)
+    response.set_text("Составьте слово из перемешанных букв:\n"
+                      " ".join(letters))
+    storage["current_answer"] = word
+    storage["answer_awaiting"] = "training_answer"
+    return response, storage
 
 
 def guess_word_training(response, storage):
