@@ -1,1 +1,1 @@
-worker: python alice_app.py
+web: gunicorn app:app
