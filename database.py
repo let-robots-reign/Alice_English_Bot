@@ -11,10 +11,10 @@ port = url.port
 
 
 class DataBase:
-    def __init__(self, id):
+    def __init__(self):
         self.conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
         self.cursor = self.conn.cursor()
-        self.user_id = id
+        self.user_id = None
 
     def create_table(self, user_id):
         self.user_id = user_id
