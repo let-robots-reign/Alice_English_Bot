@@ -34,6 +34,8 @@ def detect_lang(text):
 
 
 def get_definition(word, lang):
+    if word.split()[0].lower() in ["the", "a", "an"]:
+        word = " ".join(word.split()[1:]).lower()
     try:
         oxford_template = 'https://od-api.oxforddictionaries.com/api/v2/entries/{}/{}'.format(lang, word)
         headers = {
